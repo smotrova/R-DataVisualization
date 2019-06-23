@@ -1,0 +1,469 @@
+---
+title: Basic Plots
+output:
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    self_contained: true
+    vertical_layout: scroll
+    theme: spacelab
+    source: embed
+---
+
+```{r}
+knitr::opts_chunk$set(cache = TRUE, fig.align = 'center')
+
+library(ggplot2)
+library(ggthemes)
+library(ggsci)
+
+library(dplyr)
+
+library(wordcloud)
+library(tm)
+
+```
+
+# {.sidebar data-width=150}
+
+#### Packages
+
+* [ggplot2](https://ggplot2.tidyverse.org/reference/index.html)
+
+* [ggsci](https://cran.r-project.org/web/packages/ggsci/vignettes/ggsci.html)
+
+* ggthemes
+
+* scales
+
+* ggradar
+
+* tm
+
+* wordclouds
+
+* dplyr
+
+* plotly
+
+
+# Data 
+
+##
+
+### Dataset
+
+```{r}
+
+data("mtcars")
+DT::datatable(mtcars)
+
+```
+
+##
+
+### Description
+
+The data was extracted from the 1974 _Motor Trend US magazine_, and comprises fuel consumption and 10 aspects of automobile design and performance for 32 automobiles (1973–74 models).
+
+A data frame with 32 observations on 11 (numeric) variables.
+
+**mpg**	 Miles/(US) gallon
+
+**cyl**	 Number of cylinders
+
+**disp**	 Displacement (cu.in.)
+
+**hp**	 Gross horsepower
+
+**drat**	 Rear axle ratio
+
+**wt**	 Weight (1000 lbs)
+
+**qsec**	 1/4 mile time
+
+**vs**	 Engine (0 = V-shaped, 1 = straight)
+
+**am**	 Transmission (0 = automatic, 1 = manual)
+
+**gear**	 Number of forward gears
+
+**carb**	 Number of carburetors
+
+
+
+# Bar plot 
+
+## 
+
+### Simple
+
+```{r barplot1}
+
+ggplot(mtcars, aes(cyl)) + 
+  geom_bar(color = I("black"), fill = I("darkcyan")) +
+    xlab("Number of cylinders in a car") +
+      ylab("Number of cars")
+  
+```
+
+##
+### Stacked
+
+```{r barplot2}
+ggplot(mtcars, aes(cyl)) + 
+  geom_bar(color = I("black"), aes(fill = factor(am))) +
+    xlab("Number of cylinders in a car") +
+      ylab("Number of cars")+
+        labs(fill = "Transmission")+
+          scale_fill_uchicago("dark")
+```
+
+
+
+# Histogramm
+##
+### 
+
+```{r}
+ggplot(mtcars, aes(hp)) +
+  geom_histogram(color = I("black"), aes(fill = ..count..), binwidth = 25) +
+    xlab("Horsepower") +
+      ylab("Number of cars")
+```
+
+##
+
+# Pie Chart
+
+##
+
+### Simple
+
+```{r piechart}
+
+ggplot(mtcars, aes(x = 1, y = sort(carb), fill = factor(sort(carb)))) +
+  geom_bar(stat = "identity") +
+      coord_polar(theta = "y") + labs(y = "Carburators", fill = "") +
+      
+      theme(
+            axis.line=element_blank(),
+            axis.text.x=element_blank(),
+            axis.text.y=element_blank(),
+            axis.ticks=element_blank(),
+            axis.title.y=element_blank(),
+            panel.background=element_blank())+
+          
+              scale_fill_aaas()
+
+```
+
+##
+### Labeled
+
+```{r}
+# calculate a number of carbs in each group of cars with 2, 3, 4, ... carbrators
+mt = mtcars %>% select(carb) %>%
+  mutate(carbFactor = factor(carb)) %>%
+    arrange(carbFactor) %>% 
+      group_by(carbFactor) %>%
+        mutate(numCarbs = sum(carb))
+
+# how much carburators in each group in %
+mt = as.data.frame(mt)
+mt$fracCarbs = round(mt$numCarbs/cumsum(mt$carb)[length(mt$carb)]*100, 1)
+
+# select each group once for labeling
+mt1 = as.data.frame(unique(mt))
+
+ggplot(mt, aes(x = 1, y = carb) ) + 
+  geom_bar(stat = "identity", aes(fill = carbFactor))+
+    geom_text(data = mt1, aes(x = 1.2, y = 94 - cumsum(numCarbs), 
+                             label = paste0(fracCarbs,"%")), size = 5) +
+      
+        coord_polar(theta = "y") + labs(y = "Carburators", fill = "") +
+  
+          theme( 
+                axis.line=element_blank(),
+                axis.text.x=element_blank(),
+                axis.text.y=element_blank(),
+                axis.ticks=element_blank(),
+                axis.title.y=element_blank(),
+                panel.background=element_blank()) +
+  
+                    scale_fill_aaas()
+
+```
+
+
+# Scatter Plots
+
+##
+
+### Simple 
+
+
+```{r scatt}
+ggplot(mtcars, aes(mpg, wt)) +
+  geom_point(aes(col = factor(cyl)), shape = 16, size = 4)+
+    xlab("Miles/(US) gallon") +
+      ylab("Weight (1000 lbs)") +
+        labs(color = "Cylinders") +
+          scale_color_aaas()
+
+```
+
+##
+
+### With Regression Line
+
+```{r scattregr}
+
+ggplot(mtcars,aes(x=mpg,y=wt,color = factor(cyl)) ) + geom_point(shape = 16, size = 4) +
+  geom_smooth(method="lm", se= TRUE, color = "red") + xlab("Miles per Gallon ") +
+  ylab("Weight") + labs(colour = "Cylinders") + scale_color_aaas()
+
+```
+
+
+# Lines
+##
+### Multiple Layers + Legend
+
+```{r lines}
+
+data("EuStockMarkets")
+EuStock <- as.data.frame(EuStockMarkets)
+
+all_stocks <- ggplot() +
+  geom_line(data = EuStock,aes(x=c(1:nrow(EuStock)), y = DAX, color = 'DAX'), 
+            size=1)+
+  
+  geom_line(data = EuStock,aes(x=c(1:nrow(EuStock)), y = SMI, color='SMI'), 
+            size =1)+
+  
+  geom_line(data = EuStock,aes(x=c(1:nrow(EuStock)), y = CAC, color = 'CAC'), 
+            size =1) +
+  
+  geom_line(data = EuStock,aes(x=c(1:nrow(EuStock)),y = FTSE, color = 'FTSE'), 
+            size =1) + 
+  
+  labs(x = "Days", y = "Price", colour = "Markets") + 
+  
+  scale_colour_aaas(guide = guide_legend(reverse = TRUE))
+  
+all_stocks
+  
+```
+
+##
+
+### Stock Markets Data
+
+Daily Closing Prices of Major European Stock Indices, 1991–1998
+
+```{r stockdata}
+DT::datatable(EuStock)
+```
+
+
+
+# Word Clouds
+
+##
+
+### Centered
+
+```{r wordcloud}
+
+# download file
+#download.file("https://ibm.box.com/shared/static/cmid70rpa7xe4ocitcga1bve7r0kqnia.txt",
+#              destfile = "./Data/churchill_speeches.txt", quiet = TRUE)
+
+
+# Load the data as a corpus
+
+dirPath <- "./Data/wordcloud"  
+speech <- Corpus(DirSource(dirPath))
+
+# inspect the content
+#inspect(speech)
+
+# Data cleaning
+
+# Convert the text to lower case
+speech <- tm_map(speech, content_transformer(tolower))
+
+# Remove numbers
+speech <- tm_map(speech, removeNumbers)
+
+# Remove english common stopwords
+speech <- tm_map(speech, removeWords, stopwords("english"))
+
+# Remove your own stop word
+# specify your stopwords as a character vector
+speech <- tm_map(speech, removeWords, c("floccinaucinihilipification", "squirrelled"))
+
+# Remove punctuations
+speech <- tm_map(speech, removePunctuation)
+
+# Eliminate extra white
+speech <- tm_map(speech, stripWhitespace)
+
+# Create a Term Ducument Matric
+dtm <-TermDocumentMatrix(speech)
+
+
+# Convert to matric
+m <- as.matrix(dtm)
+
+# Sort
+v <- sort(rowSums(m), decreasing = TRUE)
+
+# Transform to a data frame
+d <- data.frame(word = names(v), freq = v)
+
+wordcloud(words = d$word, freq = d$freq, scale=c(5,.1), min.freq = 1, max.words = 175,
+          colors=brewer.pal(8, "Dark2"),
+          random.order = FALSE)
+
+```
+
+##
+
+### Random
+
+```{r wordcloud1}
+
+wordcloud(words = d$word, freq = d$freq, scale=c(5,.1), min.freq = 1, max.words = 175,
+          colors=brewer.pal(8, "Dark2"),
+          random.order = TRUE)
+```
+
+###
+
+[Text](https://ibm.box.com/shared/static/cmid70rpa7xe4ocitcga1bve7r0kqnia.txt)
+
+
+# Radar Charts
+
+##
+
+###
+
+```{r radarlibraries}
+# download from the GitHub repository of the developer, Ricardo Bion
+# devtools::install_github("ricardo-bion/ggradar", dependencies=TRUE)
+
+library(ggradar)
+library(scales)
+
+```
+
+```{r radardata}
+
+#Select our dataset
+mtcars %>%
+  
+  #atribute rownames to a variable
+  add_rownames( var = "group" ) %>%
+  
+    #assign each variable -- car names -- to their related variables
+      mutate_each(funs(rescale), -group) %>%
+  
+        #select which data to plot
+        head(3) %>% select(1:10) -> mtcars_radar
+
+```
+
+```{r radarchart, fig.height=6, fig.width=9}
+
+options(warn=-1)
+ggradar(mtcars_radar)
+
+```
+
+##
+
+
+# Box Plots
+
+##
+
+###
+
+```{r boxplot}
+
+ggplot(mtcars, aes(factor(cyl), mpg)) + 
+    geom_boxplot(aes(fill = factor(cyl)) )+
+        xlab("Cylinders") + ylab("Miles per Gallon") +
+            scale_fill_aaas() + 
+                #remove legend
+                theme(legend.position="none")
+
+plotly:: ggplotly()
+
+```
+
+##
+
+
+# Maps
+
+##
+
+### European Union
+
+```{r ggplotmap}
+
+states = read.csv("./Data/states.csv")
+
+worldMap <- map_data("world")
+
+states2 <- states %>% filter(European.Union == "Member") %>% 
+  mutate(Country = as.character(Country))
+
+worldMap1 <- worldMap %>% 
+  mutate(region = ifelse(region == "UK", "United Kingdom", region)) %>%
+    arrange(desc(region) )
+
+worldMap2 <- worldMap1 %>% filter(region %in% states2$Country)
+
+europMap <- left_join(worldMap2, states2, by = c("region"="Country"))
+
+
+ggplot(europMap, aes(x = long, y = lat, group = group, fill = factor(Accession.Year)) ) + 
+  geom_polygon(color = "black") + labs(fill = "Accession Year") +
+  theme( 
+    axis.line=element_blank(),
+    axis.text.x=element_blank(),
+    axis.text.y=element_blank(),
+    axis.ticks=element_blank(),
+    axis.title.y=element_blank(),
+    axis.title.x=element_blank(),
+    panel.background=element_blank()) +
+  
+  scale_fill_aaas()
+```
+
+##
+
+### Euro Zone
+
+```{r ggplotmap2}
+
+ggplot(europMap, aes(x = long, y = lat, group = group, 
+                     fill = factor(ifelse(Currency == 'Euro', 'Euro', 'Non-Euro'))) ) + 
+  geom_polygon(color = "black") + labs(fill = 'Zone') +
+  theme( 
+    axis.line=element_blank(),
+    axis.text.x=element_blank(),
+    axis.text.y=element_blank(),
+    axis.ticks=element_blank(),
+    axis.title.y=element_blank(),
+    axis.title.x=element_blank(),
+    panel.background=element_blank()) +
+  
+  scale_fill_aaas()
+  
+
+```
